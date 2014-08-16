@@ -10,6 +10,12 @@
 
 #include <common.h>
 
+struct client {
+	int fd;
+};
+
+struct client clients[5];
+
 void __attribute__((noreturn))
 server(char *shost, char *sport)
 {
@@ -54,19 +60,25 @@ server(char *shost, char *sport)
 
 	printf("Listening on %s:%s.\n", host, port);
 
-	cfd = accept(sfd, (struct sockaddr *)&addr, &addrlen);
-	if (cfd < 0)
-		die_("accept: %s", strerror(errno));
-	close(sfd);
+	while (1) {
+		cfd = accept(sfd, (struct sockaddr *)&addr, &addrlen);
+		if (cfd < 0)
+			die_("accept: %s", strerror(errno));
 
-	err = getnameinfo((struct sockaddr *)&addr, addrlen,
-			  host, sizeof(host), port, sizeof(port),
-			  NI_NUMERICHOST | NI_NUMERICSERV);
-	if (err)
-		die_("getnameinfo: %s", gai_strerror(err));
+		err = getnameinfo((struct sockaddr *)&addr, addrlen,
+				  host, sizeof(host), port, sizeof(port),
+				  NI_NUMERICHOST | NI_NUMERICSERV);
+		if (err)
+			die_("getnameinfo: %s", gai_strerror(err));
 
-	printf("Got a connection from %s:%s.\n", host, port);
-
-	close(cfd);
-	exit(EXIT_SUCCESS);
+		if (cfd < (int)(sizeof(clients)/sizeof(clients[0]))) {
+			clients[cfd].fd = cfd;
+			printf("Got a connection (%d) from %s:%s.\n", cfd, host, port);
+		} else {
+			char msg[] = "Connection refused (no slots available).\n";
+			write(cfd, msg, sizeof(msg));
+			close(cfd);
+			printf("Rejected a connection (%d) from %s:%s.\n", cfd, host, port);
+		}
+	}
 }
