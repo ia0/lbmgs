@@ -1,5 +1,5 @@
-#include <stdio.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 void __attribute__((noreturn))
@@ -12,11 +12,7 @@ usage: chess { server | client } <host> <port>\n\
 }
 
 void __attribute__((noreturn))
-server(char *host, char *port)
-{
-	printf("server %s %s\n", host, port);
-	exit(EXIT_SUCCESS);
-}
+server(char *host, char *port);
 
 void __attribute__((noreturn))
 client(char *host, char *port)
