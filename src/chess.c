@@ -15,11 +15,7 @@ void __attribute__((noreturn))
 server(char *host, char *port);
 
 void __attribute__((noreturn))
-client(char *host, char *port)
-{
-	printf("client %s %s\n", host, port);
-	exit(EXIT_SUCCESS);
-}
+client(char *host, char *port);
 
 int
 main(int argc, char *argv[])
