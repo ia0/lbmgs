@@ -7,4 +7,7 @@ die(char *msg, ...);
 #define die_(fmt, ...)						\
 	die("%s:%d: " fmt, __FILE__, __LINE__, __VA_ARGS__)
 
+void __attribute__((format(printf, 1, 2)))
+eprintf(char *fmt, ...);
+
 #endif /* common.h */

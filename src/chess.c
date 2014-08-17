@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/ip.h>
@@ -84,9 +85,31 @@ listen_on(char *shost, char *sport)
 	return sfd;
 }
 
+/*
+ * nonblock(): set the O_NONBLOCK status flag
+ * @fd: the file descriptor
+ *
+ * Return: 0 for success and -1 for failure
+ */
+int
+nonblock(int fd)
+{
+	int flags;
+	flags = fcntl(fd, F_GETFL);
+	if (flags < 0) {
+		eprintf("%d: fcntl(F_GETFL): %s\n", fd, strerror(errno));
+		return -1;
+	}
+	if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+		eprintf("%d: fcntl(F_SETFL): %s\n", fd, strerror(errno));
+		return -1;
+	}
+	return 0;
+}
+
 /* clean(): free allocated data */
-static void
-clean(void)
+static void __attribute__((noreturn))
+clean(int status)
 {
 	int i;
 	for (i = 0; i < 4; i++)
@@ -97,6 +120,7 @@ clean(void)
 			fclose(clients[i].stream);
 		}
 	free(line);
+	exit(status);
 }
 
 /* user(): handle commands from user */
@@ -110,8 +134,7 @@ user(void)
 			line[--read] = 0;
 
 		if (!strcmp(line, "quit")) {
-			clean();
-			exit(EXIT_SUCCESS);
+			clean(EXIT_SUCCESS);
 		} else if (!strcmp(line, "help")) {
 			printf("Available commands are:\n");
 			printf("  help    print this help\n");
@@ -120,6 +143,11 @@ user(void)
 			printf("Invalid command '%s' (try help).\n", line);
 		}
 	}
+	if (feof(stdin))
+		clean(EXIT_SUCCESS);
+	assert(errno & (EAGAIN | EWOULDBLOCK));
+	assert(ferror(stdin));
+	clearerr(stdin);
 }
 
 /*
@@ -139,7 +167,7 @@ server(int sfd)
 
 	fd = accept(sfd, (struct sockaddr *)&addr, &addrlen);
 	if (fd < 0) {
-		fprintf(stderr, "accept: %s\n", strerror(errno));
+		eprintf("accept: %s\n", strerror(errno));
 		return;
 	}
 
@@ -147,22 +175,22 @@ server(int sfd)
 			  host, sizeof(host), port, sizeof(port),
 			  NI_NUMERICHOST | NI_NUMERICSERV);
 	if (err) {
-		fprintf(stderr, "getnameinfo: %s\n", gai_strerror(err));
-		close(fd);
-		return;
+		eprintf("getnameinfo: %s\n", gai_strerror(err));
+		goto close;
 	}
 
 	printf("%d: connected from %s:%s\n", fd, host, port);
+
+	if (nonblock(fd))
+		goto close;
 
 	if (fd >= SLOTS) {
 		const char msg[] = "Connection refused (no slots available).\n";
 		assert(fd == SLOTS);
 		if (write(fd, msg, sizeof(msg)) < 0)
-			fprintf(stderr, "%d: write: %s\n", fd, strerror(errno));
-		if (close(fd))
-			fprintf(stderr, "%d: close: %s\n", fd, strerror(errno));
+			eprintf("%d: write: %s\n", fd, strerror(errno));
 		printf("%d: rejected (no slots available)\n", fd);
-		return;
+		goto close;
 	}
 
 	assert(!clients[fd].stream);
@@ -174,9 +202,8 @@ server(int sfd)
 	 */
 	stream = fdopen(fd, "r+");
 	if (!stream) {
-		fprintf(stderr, "%d: fdopen: %s\n", fd, strerror(errno));
-		close(fd);
-		return;
+		eprintf("%d: fdopen: %s\n", fd, strerror(errno));
+		goto close;
 	}
 	fprintf(stream, "Hello %s:%s\n", host, port);
 	fflush(stream);
@@ -186,13 +213,20 @@ server(int sfd)
 	polls[fd].fd = fd;
 	polls[fd].events = POLLIN;
 	polls[fd].revents = 0;
+	return;
+
+close:
+	if (close(fd))
+		eprintf("%d: close: %s\n", fd, strerror(errno));
+	return;
 }
 
 static void
 close_client(struct client *c)
 {
 	printf("%d: closing\n", c->poll->fd);
-	fclose(c->stream);
+	if (fclose(c->stream))
+		eprintf("%d: fclose: %s\n", c->poll->fd, strerror(errno));
 	c->stream = 0;
 	c->poll->fd = -1;
 	c->poll->events = 0;
@@ -206,28 +240,23 @@ client(struct client *c)
 {
 	ssize_t read;
 
-	if (feof(c->stream) || ferror(c->stream)) {
-		printf("%d: feof or ferror\n", c->poll->fd);
+	while ((read = getline(&line, &linelen, c->stream)) > 0) {
+		if (line[read-1] != '\n')
+			eprintf("%d: missing end of line\n", c->poll->fd);
+		else
+			line[--read] = 0;
+
+		/* TODO: do the real stuff here */
+		printf("%d: got '%s'\n", c->poll->fd, line);
+	}
+	if (feof(c->stream)) {
+		printf("%d: eof\n", c->poll->fd);
 		close_client(c);
 		return;
 	}
-
-	read = getline(&line, &linelen, c->stream);
-	if (read < 0) {
-		printf("%d: read returned %zd\n", c->poll->fd, read);
-		close_client(c);
-		return;
-	}
-
-	if (line[read-1] != '\n')
-		printf("%d: missing end of line\n", c->poll->fd);
-	else
-		line[--read] = 0;
-
-	/* TODO: do the real stuff here */
-	printf("%d: got '%s'\n", c->poll->fd, line);
-
-	c->poll->revents = 0;
+	assert(errno & (EAGAIN | EWOULDBLOCK));
+	assert(ferror(c->stream));
+	clearerr(c->stream);
 }
 
 int
@@ -251,14 +280,29 @@ main(int argc, char *argv[])
 		polls[i].fd = i;
 	polls[0].events = POLLIN;
 	polls[3].events = POLLIN;
+	nonblock(0);
+	nonblock(3);
 	for (i = 4; i < SLOTS; i++)
 		polls[i].fd = -1;
 
+#if DEBUG
+	int count;
+	for (count = 0; count < 12; count++) {
+#else
 	while (1) {
-		int n = poll(polls, SLOTS, -1);
+#endif
+		int n;
+		printf("> ");
+		fflush(stdout);
+		n = poll(polls, SLOTS, -1);
 		if (n < 0)
 			die_("poll: %s", strerror(errno));
-		printf("Polled %d fd%s.\n", n, n == 1 ? "" : "s");
+#if DEBUG
+		if (!n)
+			eprintf("\rNo fds were polled.\n");
+		else
+#endif
+			printf("\rPolled %d fd%s.\n", n, n > 1 ? "" : "s");
 
 		/* Dispatch according to the file descriptor. */
 		if (polls[0].revents)
@@ -269,4 +313,8 @@ main(int argc, char *argv[])
 			if (clients[i].stream && polls[i].revents)
 				client(&clients[i]);
 	}
+#if DEBUG
+	printf("End of loop.\n");
+	clean(EXIT_SUCCESS);
+#endif
 }
