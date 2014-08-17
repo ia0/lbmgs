@@ -12,6 +12,7 @@ endif
 
 SRCS += src/chess.c
 SRCS += src/common.c
+SRCS += src/client.c
 
 OBJS = $(patsubst src/%.c,build/%.o,$(SRCS))
 DEPS = $(patsubst src/%.c,build/%.d,$(SRCS))
