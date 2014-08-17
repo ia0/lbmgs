@@ -2,24 +2,22 @@
 #define CLIENT_H
 
 struct client_state {
-	int game;
+	int id;
+	int party;
 };
 
 /*
  * client_init(): initialize the client state
  * @state: an allocated state
- *
- * May use cprintf() and cflush().
+ * @id:    client id
  */
 void
-client_init(struct client_state *state);
+client_init(struct client_state *state, int id);
 
 /*
  * client_process(): process a line from the client
  * @state: the client state
  * @line: its input line
- *
- * May use cprintf() and cflush().
  *
  * Return: 0 for success and -1 for failure
  */

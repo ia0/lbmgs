@@ -10,4 +10,16 @@ die(char *msg, ...);
 void __attribute__((format(printf, 1, 2)))
 eprintf(char *fmt, ...);
 
+int __attribute__((format(printf, 1, 2)))
+cprintf(char *fmt, ...);
+
+void
+cflush(void);
+
+int __attribute__((format(printf, 1, 2)))
+gprintf(char *fmt, ...);
+
+int __attribute__((format(printf, 1, 2)))
+geprintf(char *fmt, ...);
+
 #endif /* common.h */

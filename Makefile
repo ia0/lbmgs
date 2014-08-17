@@ -12,11 +12,10 @@ endif
 
 SRCS += src/main.c
 SRCS += src/common.c
-SRCS += src/client.c
 SRCS += src/parser.c
+SRCS += src/client.c
 SRCS += src/game.c
-SRCS += src/party.c
-SRCS += src/chat.c
+SRCS += src/game/chat.c
 
 OBJS = $(patsubst src/%.c,build/%.o,$(SRCS))
 DEPS = $(patsubst src/%.c,build/%.d,$(SRCS))
@@ -26,18 +25,16 @@ EXE = build/mgs
 .PHONY: all
 all: $(EXE)
 
-$(EXE): $(OBJS) | build
+$(EXE): $(OBJS)
 	@echo "  LD $@"
 	@$(LD) $(OBJS) -o $@
 
 -include $(DEPS)
 
-build/%.o build/%.d: | build
+build/%.o build/%.d:
+	@mkdir -p $(dir $@)
 	@echo "  CC build/$*.o"
 	@$(CC) -MMD -c src/$*.c -o build/$*.o
-
-build:
-	mkdir build
 
 .PHONY: clean
 clean:

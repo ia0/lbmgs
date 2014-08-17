@@ -15,7 +15,7 @@
 #include <common.h>
 #include <client.h>
 
-char *program = "mgs";
+char *program = "lbmgs";
 
 struct client {
 	FILE *stream;
@@ -31,29 +31,9 @@ static struct pollfd polls[SLOTS];
 static char *line;
 static size_t linelen;
 
-/* Hidden stream for clients. */
-static FILE *cstream;
-
-int __attribute__((format(printf, 1, 2)))
-cprintf(char *fmt, ...)
-{
-	int ret;
-	va_list ap;
-	va_start(ap, fmt);
-	assert(cstream != NULL);
-	ret = vfprintf(cstream, fmt, ap);
-	va_end(ap);
-	return ret;
-}
-
-void
-cflush(void)
-{
-	assert(cstream != NULL);
-	if (fflush(cstream))
-		eprintf("cflush: %s\n", strerror(errno));
-	return;
-}
+/* Hidden variable for printing. */
+FILE *cstream = NULL;
+int cfd = -1;
 
 static void __attribute__((noreturn))
 usage(int status)
@@ -130,15 +110,18 @@ static int
 nonblock(int fd)
 {
 	int flags;
+
 	flags = fcntl(fd, F_GETFL);
 	if (flags < 0) {
 		eprintf("%d: fcntl(F_GETFL): %s\n", fd, strerror(errno));
 		return -1;
 	}
+
 	if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) {
 		eprintf("%d: fcntl(F_SETFL): %s\n", fd, strerror(errno));
 		return -1;
 	}
+
 	return 0;
 }
 
@@ -146,15 +129,21 @@ nonblock(int fd)
 static void
 close_client(struct client *c)
 {
-	printf("%d: closing\n", c->poll->fd);
+	cstream = c->stream;
+	cfd = c->poll->fd;
+
+	gprintf("closing\n");
 	client_clean(&c->state);
 	c->poll->fd = -1;
 	c->poll->events = 0;
 	c->poll->revents = 0;
 	c->poll = NULL;
-	if (fclose(c->stream))
-		eprintf("%d: fclose: %s\n", c->poll->fd, strerror(errno));
+	if (fclose(cstream))
+		geprintf("fclose: %s\n", strerror(errno));
 	c->stream = NULL;
+
+	cfd = -1;
+	cstream = NULL;
 	return;
 }
 
@@ -163,6 +152,7 @@ static void __attribute__((noreturn))
 clean(int status)
 {
 	int i;
+
 	for (i = 0; i < 4; i++)
 		close(i);
 	for (i = 4; i < SLOTS; i++)
@@ -172,6 +162,7 @@ clean(int status)
 			close_client(&clients[i]);
 		}
 	free(line);
+
 	exit(status);
 }
 
@@ -197,9 +188,11 @@ user(void)
 	}
 	if (feof(stdin))
 		clean(EXIT_SUCCESS);
+
 	assert(errno & (EAGAIN | EWOULDBLOCK));
 	assert(ferror(stdin));
 	clearerr(stdin);
+
 	return;
 }
 
@@ -215,10 +208,9 @@ server(int sfd)
 	socklen_t addrlen = sizeof(addr);
 	char host[NI_MAXHOST];
 	char port[NI_MAXSERV];
-	int fd;
 
-	fd = accept(sfd, (struct sockaddr *)&addr, &addrlen);
-	if (fd < 0) {
+	cfd = accept(sfd, (struct sockaddr *)&addr, &addrlen);
+	if (cfd < 0) {
 		eprintf("accept: %s\n", strerror(errno));
 		return;
 	}
@@ -227,53 +219,54 @@ server(int sfd)
 			  host, sizeof(host), port, sizeof(port),
 			  NI_NUMERICHOST | NI_NUMERICSERV);
 	if (err) {
-		eprintf("getnameinfo: %s\n", gai_strerror(err));
+		geprintf("getnameinfo: %s\n", gai_strerror(err));
 		goto close;
 	}
 
-	printf("%d: connected from %s:%s\n", fd, host, port);
+	gprintf("connected from %s:%s\n", host, port);
 
-	if (nonblock(fd))
+	if (nonblock(cfd))
 		goto close;
 
-	if (fd >= SLOTS) {
+	if (cfd >= SLOTS) {
 		const char msg[] = "Connection refused (no slots available).\n";
-		assert(fd == SLOTS);
-		if (write(fd, msg, sizeof(msg)) < 0)
-			eprintf("%d: write: %s\n", fd, strerror(errno));
-		printf("%d: rejected (no slots available)\n", fd);
+		assert(cfd == SLOTS);
+		if (write(cfd, msg, sizeof(msg)) < 0)
+			geprintf("write: %s\n", strerror(errno));
+		gprintf("rejected (no slots available)\n");
 		goto close;
 	}
 
-	assert(clients[fd].stream == NULL);
-	assert(polls[fd].fd == -1);
+	assert(clients[cfd].stream == NULL);
+	assert(polls[cfd].fd == -1);
 
 	/*
 	 * From now on, only work with streams. The file descriptor is
 	 * used for poll and logging.
 	 */
 	assert(cstream == NULL);
-	cstream = fdopen(fd, "r+");
+	cstream = fdopen(cfd, "r+");
 	if (cstream == NULL) {
-		eprintf("%d: fdopen: %s\n", fd, strerror(errno));
+		geprintf("fdopen: %s\n", strerror(errno));
 		goto close;
 	}
 	fprintf(cstream, "Hello %s:%s\n", host, port);
 	fflush(cstream);
 
-	clients[fd].stream = cstream;
-	clients[fd].poll = &polls[fd];
-	polls[fd].fd = fd;
-	polls[fd].events = POLLIN;
-	polls[fd].revents = 0;
-	client_init(&clients[fd].state);
+	clients[cfd].stream = cstream;
+	clients[cfd].poll = &polls[cfd];
+	polls[cfd].fd = cfd;
+	polls[cfd].events = POLLIN;
+	polls[cfd].revents = 0;
+	client_init(&clients[cfd].state, cfd);
 	goto end;
 
 close:
-	if (close(fd))
-		eprintf("%d: close: %s\n", fd, strerror(errno));
+	if (close(cfd))
+		geprintf("close: %s\n", strerror(errno));
 end:
 	cstream = NULL;
+	cfd = -1;
 	return;
 }
 
@@ -284,18 +277,20 @@ client(struct client *c)
 	ssize_t read;
 
 	cstream = c->stream;
+	cfd = c->poll->fd;
+
 	while ((read = getline(&line, &linelen, cstream)) > 0) {
 		if (line[read-1] != '\n')
-			eprintf("%d: missing end of line\n", c->poll->fd);
+			geprintf("missing end of line\n");
 		else
 			line[--read] = '\0';
 
-		printf("%d: got [4m%s[m\n", c->poll->fd, line);
+		gprintf("got [4m%s[m\n", line);
 		if (client_process(&c->state, line))
 			goto close;
 	}
 	if (feof(cstream)) {
-		printf("%d: eof\n", c->poll->fd);
+		gprintf("eof\n");
 		goto close;
 	}
 	assert(errno & (EAGAIN | EWOULDBLOCK));
@@ -308,6 +303,7 @@ close:
 	close_client(c);
 end:
 	cstream = NULL;
+	cfd = -1;
 	return;
 }
 
@@ -340,7 +336,7 @@ main(int argc, char *argv[])
 
 #if DEBUG
 	int count;
-	for (count = 0; count < 12; count++) {
+	for (count = 0; count < 20; count++) {
 #else
 	while (1) {
 #endif
