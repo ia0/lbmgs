@@ -21,6 +21,7 @@ struct client {
 static struct client clients[SLOTS];
 static struct pollfd polls[SLOTS];
 
+/* Arguments of getline(). */
 static char *line;
 static size_t linelen;
 
@@ -31,6 +32,13 @@ usage(int status)
 	exit(status);
 }
 
+/*
+ * listen_on(): create, bind, and listen
+ * @shost: hostname to listen to
+ * @sport: port to listen to
+ *
+ * Return: the socket file descriptor
+ */
 static int
 listen_on(char *shost, char *sport)
 {
@@ -76,6 +84,7 @@ listen_on(char *shost, char *sport)
 	return sfd;
 }
 
+/* clean(): free allocated data */
 static void
 clean(void)
 {
@@ -83,11 +92,14 @@ clean(void)
 	for (i = 0; i < 4; i++)
 		close(i);
 	for (i = 4; i < SLOTS; i++)
-		if (clients[i].stream)
+		if (clients[i].stream) {
+			fprintf(clients[i].stream, "Shutting down.\n");
 			fclose(clients[i].stream);
+		}
 	free(line);
 }
 
+/* user(): handle commands from user */
 static void
 user(void)
 {
@@ -98,7 +110,6 @@ user(void)
 			line[--read] = 0;
 
 		if (!strcmp(line, "quit")) {
-			/* TODO: inform clients about the shutdown. */
 			clean();
 			exit(EXIT_SUCCESS);
 		} else if (!strcmp(line, "help")) {
@@ -111,6 +122,10 @@ user(void)
 	}
 }
 
+/*
+ * server(): accept a connection and setup the client
+ * @sfd: the listening socket
+ */
 static void
 server(int sfd)
 {
@@ -153,6 +168,10 @@ server(int sfd)
 	assert(!clients[fd].stream);
 	assert(polls[fd].fd == -1);
 
+	/*
+	 * From now on, only work with streams. The file descriptor is
+	 * used for poll and logging.
+	 */
 	stream = fdopen(fd, "r+");
 	if (!stream) {
 		fprintf(stderr, "%d: fdopen: %s\n", fd, strerror(errno));
@@ -181,6 +200,7 @@ close_client(struct client *c)
 	c->poll = 0;
 }
 
+/* client(): handle commands from clients */
 static void
 client(struct client *c)
 {
@@ -204,6 +224,7 @@ client(struct client *c)
 	else
 		line[--read] = 0;
 
+	/* TODO: do the real stuff here */
 	printf("%d: got '%s'\n", c->poll->fd, line);
 
 	c->poll->revents = 0;
