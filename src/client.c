@@ -39,13 +39,35 @@ cflush(int cid)
 }
 
 void
+cprompt(int cid)
+{
+	int p;
+
+	assert(valid_cid(cid));
+
+	p = clients[cid].party;
+
+	if (p == -1) {
+		cprintf(cid, "%d> ", cid);
+		cflush(cid);
+		return;
+	}
+
+	assert(valid_party(p));
+	assert(parties[p].game != NULL);
+
+	cprintf(cid, "%d %s> ", cid, parties[p].game->name);
+	cflush(cid);
+	return;
+}
+
+void
 client_init(int cid)
 {
 	assert(valid_cid(cid));
 
 	cprintf(cid, "Type 'list' to list games and parties or 'help' for help.\n");
-	cprintf(cid, "> ");
-	cflush(cid);
+	cprompt(cid);
 
 	assert(clients[cid].party = -1);
 
@@ -59,14 +81,34 @@ cmd_list(int cid)
 
 	assert(valid_cid(cid));
 
-	cprintf(cid, "Available games:\n");
+	cprintf(cid, "Available parties (to join):\n");
+
+	for (i = 0; i < PARTY_SLOTS; i++)
+		if (parties[i].game != NULL)
+			cprintf(cid, "%4d:  %s\n", i, parties[i].game->name);
+
+	cprintf(cid, "Available games (to create):\n");
 
 	for (i = 0; i < gameslen; i++)
-		cprintf(cid, "  %d: %s\n", i, games[i]->name);
-
-	cprintf(cid, "Type 'create <n>' to create a party of game <n>.\n");
+		cprintf(cid, "%4d:  %s\n", i, games[i]->name);
 
 	return;
+}
+
+static void
+cmd_join(int cid, int p)
+{
+	assert(valid_cid(cid));
+
+	if (!valid_party(p) || parties[p].game == NULL) {
+		cprintf(cid, "Invalid party.\n");
+		return;
+	}
+
+	assert(parties[p].game->join != NULL);
+
+	if (parties[p].game->join(cid, parties[p].data))
+		clients[cid].party = p;
 }
 
 static void
@@ -76,6 +118,13 @@ cmd_create(int cid, int g)
 
 	assert(valid_cid(cid));
 
+	if (!valid_game(g)) {
+		cprintf(cid, "Not a valid game.\n");
+		return;
+	}
+
+	assert(games[g]->create != NULL);
+
 	p = available_party();
 	if (p < 0) {
 		cprintf(cid, "No slot available.\n");
@@ -84,8 +133,7 @@ cmd_create(int cid, int g)
 
 	clients[cid].party = p;
 	parties[p].game = games[g];
-	assert(games[g]->init != NULL);
-	parties[p].data = games[g]->init(cid);
+	parties[p].data = games[g]->create(cid);
 
 	return;
 }
@@ -103,7 +151,8 @@ client_process(int cid, char *line)
 	if (p >= 0) {
 		assert(valid_party(p));
 		assert(parties[p].game->process != NULL);
-		parties[p].game->process(cid, parties[p].data, line);
+		if (parties[p].game->process(cid, parties[p].data, line) < 0)
+			client_clean(cid);
 		goto end;
 	}
 
@@ -116,7 +165,7 @@ client_process(int cid, char *line)
 	} else if (parsef(&line, "join%+")) {
 		if (!parsef(&line, "%d%*%.", &arg))
 			goto invalid;
-		cprintf(cid, "todo join %d\n", arg);
+		cmd_join(cid, arg);
 	} else if (parsef(&line, "create%+")) {
 		if (!parsef(&line, "%d%*%.", &arg))
 			goto invalid;
@@ -124,6 +173,8 @@ client_process(int cid, char *line)
 	} else if (parsef(&line, "quit%*")) {
 		if (!parsef(&line, "%."))
 			goto invalid;
+		return -1;
+	} else if (parsef(&line, "%.")) {
 		return -1;
 	} else if (parsef(&line, "help%*")) {
 		if (!parsef(&line, "%."))
@@ -142,14 +193,29 @@ client_process(int cid, char *line)
 invalid:
 	cprintf(cid, "Invalid trailing '%s'.\n", line);
 end:
-	cprintf(cid, "> ");
-	cflush(cid);
+	cprompt(cid);
 	return 0;
 }
 
 void
 client_clean(int cid)
 {
+	int p;
+
+	assert(valid_cid(cid));
+
+	p = clients[cid].party;
+
+	if (p == -1)
+		return;
+
+	assert(valid_party(p));
+	assert(parties[p].game->leave != NULL);
+	if (parties[p].game->leave(cid, parties[p].data)) {
+		parties[p].game = NULL;
+		parties[p].data = NULL;
+	}
 	clients[cid].party = -1;
+
 	return;
 }

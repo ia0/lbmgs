@@ -8,13 +8,11 @@ struct client {
 #define SLOTS 20
 extern struct client clients[SLOTS];
 
-#ifndef NDEBUG
 static inline int
 valid_cid(int cid)
 {
 	return 0 <= cid && cid < SLOTS;
 }
-#endif
 
 /* cprintf(): print to a client */
 int __attribute__((format(printf, 2, 3)))
@@ -23,6 +21,10 @@ cprintf(int cid, char *fmt, ...);
 /* cflush(): flush the stream of a client */
 void
 cflush(int cid);
+
+/* cprompt(): shows the prompt for a client */
+void
+cprompt(int cid);
 
 /* client_init(): initialize the client */
 void

@@ -268,7 +268,7 @@ client(int cid)
 			line[--read] = '\0';
 
 		gprintf(cid, "got [4m%s[m\n", line);
-		if (client_process(cid, line))
+		if (client_process(cid, line) < 0)
 			goto close;
 	}
 	if (feof(cstream)) {
@@ -283,7 +283,6 @@ client(int cid)
 	return;
 
 close:
-	fprintf(cstream, "Good bye.\n");
 	close_client(cid);
 	return;
 }
