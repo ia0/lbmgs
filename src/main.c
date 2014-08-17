@@ -15,6 +15,8 @@
 #include <common.h>
 #include <client.h>
 
+char *program = "mgs";
+
 struct client {
 	FILE *stream;
 	struct pollfd *poll;
@@ -56,7 +58,7 @@ cflush(void)
 static void __attribute__((noreturn))
 usage(int status)
 {
-	printf("usage: chess <host> <port>\n");
+	printf("usage: %s <host> <port>\n", program);
 	exit(status);
 }
 
@@ -316,6 +318,7 @@ main(int argc, char *argv[])
 	int sfd;
 
 	/* Check command line arguments. */
+	program = argv[0];
 	if (argc == 2 && !strcmp("--help", argv[1]))
 		usage(EXIT_SUCCESS);
 	if (argc != 3)

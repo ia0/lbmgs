@@ -10,7 +10,7 @@ else
 CC += -DNDEBUG
 endif
 
-SRCS += src/chess.c
+SRCS += src/main.c
 SRCS += src/common.c
 SRCS += src/client.c
 SRCS += src/parser.c
@@ -18,7 +18,7 @@ SRCS += src/parser.c
 OBJS = $(patsubst src/%.c,build/%.o,$(SRCS))
 DEPS = $(patsubst src/%.c,build/%.d,$(SRCS))
 
-EXE = build/chess
+EXE = build/mgs
 
 .PHONY: all
 all: $(EXE)
