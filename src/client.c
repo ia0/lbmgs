@@ -3,6 +3,7 @@
 
 #include <common.h>
 #include <client.h>
+#include <parser.h>
 
 int __attribute__((format(printf, 1, 2)))
 cprintf(char *fmt, ...);
@@ -13,6 +14,7 @@ cflush(void);
 void
 client_init(struct client_state *state)
 {
+	cprintf("Type 'list' to list games or 'help' for help.\n");
 	cprintf("> ");
 	cflush();
 	memset(state, 0, sizeof(*state));
@@ -22,19 +24,42 @@ client_init(struct client_state *state)
 int
 client_process(struct client_state *state, char *line)
 {
+	int arg;
 	(void)state;
-	if (!strcmp(line, "list")) {
-		cprintf("list: '%s'\n", &line[4]);
-	} else if (!strcmp(line, "help")) {
-		cprintf("Available commands are:\n");
-		cprintf("  help    print this help\n");
-		cprintf("  list    list games\n");
-		cprintf("  quit    quit the server\n");
-	} else if (!strcmp(line, "quit")) {
+	parsef(&line, "%*");
+	if (parsef(&line, "list%*")) {
+		if (!parsef(&line, "%."))
+			goto invalid;
+		cprintf("todo list\n");
+	} else if (parsef(&line, "join%+")) {
+		if (!parsef(&line, "%d%*%.", &arg))
+			goto invalid;
+		cprintf("todo join %d\n", arg);
+	} else if (parsef(&line, "create%+")) {
+		if (!parsef(&line, "%d%*%.", &arg))
+			goto invalid;
+		cprintf("todo create %d\n", arg);
+	} else if (parsef(&line, "quit%*")) {
+		if (!parsef(&line, "%."))
+			goto invalid;
 		return -1;
+	} else if (parsef(&line, "help%*")) {
+		if (!parsef(&line, "%."))
+			goto invalid;
+		cprintf("Available commands are:\n");
+		cprintf("  list    list games\n");
+		cprintf("  join    join a game\n");
+		cprintf("  create  create a game\n");
+		cprintf("  quit    quit the server\n");
+		cprintf("  help    print this help\n");
 	} else {
-		cprintf("Invalid command '%s' (try help).\n", line);
+		goto invalid;
 	}
+	goto end;
+
+invalid:
+	cprintf("Invalid trailing '%s'.\n", line);
+end:
 	cprintf("> ");
 	cflush();
 	return 0;

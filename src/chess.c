@@ -187,8 +187,8 @@ user(void)
 			clean(EXIT_SUCCESS);
 		} else if (!strcmp(line, "help")) {
 			printf("Available commands are:\n");
-			printf("  help    print this help\n");
 			printf("  quit    quit the server\n");
+			printf("  help    print this help\n");
 		} else {
 			printf("Invalid command '%s' (try help).\n", line);
 		}
@@ -288,7 +288,7 @@ client(struct client *c)
 		else
 			line[--read] = '\0';
 
-		printf("%d: got '%s'\n", c->poll->fd, line);
+		printf("%d: got [4m%s[m\n", c->poll->fd, line);
 		if (client_process(&c->state, line))
 			goto close;
 	}
