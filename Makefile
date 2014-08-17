@@ -2,6 +2,7 @@ GCC = gcc -Wall -Wextra -Werror
 CC = $(GCC) -Isrc
 LD = $(GCC)
 
+DEBUG = yes
 ifdef DEBUG
 GCC += -g
 CC += -DDEBUG
@@ -11,8 +12,6 @@ endif
 
 SRCS += src/chess.c
 SRCS += src/common.c
-SRCS += src/server.c
-SRCS += src/client.c
 
 OBJS = $(patsubst src/%.c,build/%.o,$(SRCS))
 DEPS = $(patsubst src/%.c,build/%.d,$(SRCS))
