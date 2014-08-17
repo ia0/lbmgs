@@ -4,6 +4,7 @@
 #include <common.h>
 #include <client.h>
 #include <parser.h>
+#include <game.h>
 
 int __attribute__((format(printf, 1, 2)))
 cprintf(char *fmt, ...);
@@ -14,11 +15,21 @@ cflush(void);
 void
 client_init(struct client_state *state)
 {
-	cprintf("Type 'list' to list games or 'help' for help.\n");
+	cprintf("Type 'list' to list games and parties or 'help' for help.\n");
 	cprintf("> ");
 	cflush();
 	memset(state, 0, sizeof(*state));
 	return;
+}
+
+static void
+cmd_list(void)
+{
+	size_t i;
+	cprintf("Available games:\n");
+	for (i = 0; i < gameslen; i++)
+		cprintf("  %zu: %s\n", i, games[i]->name);
+	cprintf("Type 'create <n>' to create a party of game <n>.\n");
 }
 
 int
@@ -30,7 +41,7 @@ client_process(struct client_state *state, char *line)
 	if (parsef(&line, "list%*")) {
 		if (!parsef(&line, "%."))
 			goto invalid;
-		cprintf("todo list\n");
+		cmd_list();
 	} else if (parsef(&line, "join%+")) {
 		if (!parsef(&line, "%d%*%.", &arg))
 			goto invalid;
@@ -47,9 +58,9 @@ client_process(struct client_state *state, char *line)
 		if (!parsef(&line, "%."))
 			goto invalid;
 		cprintf("Available commands are:\n");
-		cprintf("  list    list games\n");
-		cprintf("  join    join a game\n");
-		cprintf("  create  create a game\n");
+		cprintf("  list    list games and parties\n");
+		cprintf("  join    join a party\n");
+		cprintf("  create  create a party\n");
 		cprintf("  quit    quit the server\n");
 		cprintf("  help    print this help\n");
 	} else {

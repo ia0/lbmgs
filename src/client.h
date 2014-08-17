@@ -1,12 +1,8 @@
 #ifndef CLIENT_H
 #define CLIENT_H
 
-enum state {
-	FRESH = 0,
-};
-
 struct client_state {
-	enum state state;
+	int game;
 };
 
 /*
