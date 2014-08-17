@@ -1,3 +1,5 @@
+#include <stddef.h>
+
 #include <game.h>
 #include <game/chat.h>
 
@@ -5,12 +7,12 @@ struct game *games[] = {
 	&chat_game,
 };
 
-size_t gameslen = sizeof(games)/sizeof(games[0]);
+int gameslen = sizeof(games)/sizeof(games[0]);
 
 struct party parties[PARTY_SLOTS];
 
 int
-available_slot(void)
+available_party(void)
 {
 	int i;
 	for (i = 0; i < PARTY_SLOTS; i++)

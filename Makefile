@@ -20,7 +20,7 @@ SRCS += src/game/chat.c
 OBJS = $(patsubst src/%.c,build/%.o,$(SRCS))
 DEPS = $(patsubst src/%.c,build/%.d,$(SRCS))
 
-EXE = build/mgs
+EXE = build/lbmgs
 
 .PHONY: all
 all: $(EXE)

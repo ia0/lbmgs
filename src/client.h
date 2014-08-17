@@ -1,36 +1,39 @@
 #ifndef CLIENT_H
 #define CLIENT_H
 
-struct client_state {
-	int id;
-	int party;
+struct client {
+	int party; /* -1 for lobby */
 };
 
-/*
- * client_init(): initialize the client state
- * @state: an allocated state
- * @id:    client id
- */
-void
-client_init(struct client_state *state, int id);
+#define SLOTS 20
+extern struct client clients[SLOTS];
 
-/*
- * client_process(): process a line from the client
- * @state: the client state
- * @line: its input line
- *
- * Return: 0 for success and -1 for failure
- */
-int
-client_process(struct client_state *state, char *line);
+#ifndef NDEBUG
+static inline int
+valid_cid(int cid)
+{
+	return 0 <= cid && cid < SLOTS;
+}
+#endif
 
-/*
- * client_clean(): cleans the client state
- * @state: the state to clean
- *
- * Does not free @state since client_init() did not allocate it.
- */
+/* cprintf(): print to a client */
+int __attribute__((format(printf, 2, 3)))
+cprintf(int cid, char *fmt, ...);
+
+/* cflush(): flush the stream of a client */
 void
-client_clean(struct client_state *state);
+cflush(int cid);
+
+/* client_init(): initialize the client */
+void
+client_init(int cid);
+
+/* client_process(): process a line from the client */
+int /* success == 0, failure == -1 */
+client_process(int cid, char *line);
+
+/* client_clean(): cleans the client state */
+void
+client_clean(int cid);
 
 #endif /* client.h */

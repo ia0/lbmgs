@@ -29,49 +29,24 @@ eprintf(char *fmt, ...)
 	return;
 }
 
-extern FILE *cstream;
-
-int __attribute__((format(printf, 1, 2)))
-cprintf(char *fmt, ...)
+int __attribute__((format(printf, 2, 3)))
+gprintf(int cid, char *fmt, ...)
 {
 	int ret;
 	va_list ap;
 	va_start(ap, fmt);
-	assert(cstream != NULL);
-	ret = vfprintf(cstream, fmt, ap);
-	va_end(ap);
-	return ret;
-}
-
-void
-cflush(void)
-{
-	assert(cstream != NULL);
-	if (fflush(cstream))
-		eprintf("cflush: %s\n", strerror(errno));
-	return;
-}
-
-extern int cfd;
-
-int __attribute__((format(printf, 1, 2)))
-gprintf(char *fmt, ...)
-{
-	int ret;
-	va_list ap;
-	va_start(ap, fmt);
-	printf("%d: ", cfd);
+	printf("%d: ", cid);
 	ret = vprintf(fmt, ap);
 	va_end(ap);
 	return ret;
 }
 
-void __attribute__((format(printf, 1, 2)))
-geprintf(char *fmt, ...)
+void __attribute__((format(printf, 2, 3)))
+geprintf(int cid, char *fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
-	fprintf(stderr, "[1;31m%d: ", cfd);
+	fprintf(stderr, "[1;31m%d: ", cid);
 	vfprintf(stderr, fmt, ap);
 	fprintf(stderr, "[m");
 	va_end(ap);

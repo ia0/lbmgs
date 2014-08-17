@@ -1,5 +1,7 @@
 #include <assert.h>
 #include <errno.h>
+#include <stdarg.h>
+#include <stdio.h>
 #include <string.h>
 
 #include <common.h>
@@ -7,66 +9,101 @@
 #include <parser.h>
 #include <game.h>
 
-void
-client_init(struct client_state *state, int id)
+extern FILE *streams[SLOTS];
+
+int __attribute__((format(printf, 2, 3)))
+cprintf(int cid, char *fmt, ...)
 {
-	cprintf("Type 'list' to list games and parties or 'help' for help.\n");
-	cprintf("> ");
-	cflush();
-	state->id = id;
-	state->party = -1;
+	int ret;
+	va_list ap;
+
+	assert(valid_cid(cid));
+	assert(streams[cid] != NULL);
+
+	va_start(ap, fmt);
+	ret = vfprintf(streams[cid], fmt, ap);
+	va_end(ap);
+
+	return ret;
+}
+
+void
+cflush(int cid)
+{
+	assert(valid_cid(cid));
+	assert(streams[cid] != NULL);
+
+	if (fflush(streams[cid]))
+		geprintf(cid, "cflush: %s\n", strerror(errno));
+	return;
+}
+
+void
+client_init(int cid)
+{
+	assert(valid_cid(cid));
+
+	cprintf(cid, "Type 'list' to list games and parties or 'help' for help.\n");
+	cprintf(cid, "> ");
+	cflush(cid);
+
+	assert(clients[cid].party = -1);
+
 	return;
 }
 
 static void
-cmd_list(void)
+cmd_list(int cid)
 {
-	size_t i;
+	int i;
 
-	cprintf("Available games:\n");
+	assert(valid_cid(cid));
+
+	cprintf(cid, "Available games:\n");
 
 	for (i = 0; i < gameslen; i++)
-		cprintf("  %zu: %s\n", i, games[i]->name);
+		cprintf(cid, "  %d: %s\n", i, games[i]->name);
 
-	cprintf("Type 'create <n>' to create a party of game <n>.\n");
+	cprintf(cid, "Type 'create <n>' to create a party of game <n>.\n");
 
 	return;
 }
 
 static void
-cmd_create(struct client_state *state, int g)
+cmd_create(int cid, int g)
 {
 	int p;
-	struct game *game;
-	struct party *party;
 
-	p = available_slot();
+	assert(valid_cid(cid));
+
+	p = available_party();
 	if (p < 0) {
-		cprintf("No slot available.\n");
+		cprintf(cid, "No slot available.\n");
 		return;
 	}
 
-	game = games[g];
-	party = &parties[p];
-	state->party = p;
-	party->game = game;
-	assert(game->init != NULL);
-	party->data = game->init(state->id);
+	clients[cid].party = p;
+	parties[p].game = games[g];
+	assert(games[g]->init != NULL);
+	parties[p].data = games[g]->init(cid);
 
 	return;
 }
 
 int
-client_process(struct client_state *state, char *line)
+client_process(int cid, char *line)
 {
 	int arg;
+	int p;
 
-	if (state->party >= 0) {
-		struct party *party;
-		assert(state->party < PARTY_SLOTS);
-		party = &parties[state->party];
-		assert(party->game->process);
-		party->game->process(party->data, line);
+	assert(valid_cid(cid));
+
+	p = clients[cid].party;
+
+	if (p >= 0) {
+		assert(valid_party(p));
+		assert(parties[p].game->process != NULL);
+		parties[p].game->process(cid, parties[p].data, line);
 		goto end;
 	}
 
@@ -75,15 +112,15 @@ client_process(struct client_state *state, char *line)
 	if (parsef(&line, "list%*")) {
 		if (!parsef(&line, "%."))
 			goto invalid;
-		cmd_list();
+		cmd_list(cid);
 	} else if (parsef(&line, "join%+")) {
 		if (!parsef(&line, "%d%*%.", &arg))
 			goto invalid;
-		cprintf("todo join %d\n", arg);
+		cprintf(cid, "todo join %d\n", arg);
 	} else if (parsef(&line, "create%+")) {
 		if (!parsef(&line, "%d%*%.", &arg))
 			goto invalid;
-		cmd_create(state, arg);
+		cmd_create(cid, arg);
 	} else if (parsef(&line, "quit%*")) {
 		if (!parsef(&line, "%."))
 			goto invalid;
@@ -91,27 +128,28 @@ client_process(struct client_state *state, char *line)
 	} else if (parsef(&line, "help%*")) {
 		if (!parsef(&line, "%."))
 			goto invalid;
-		cprintf("Available commands are:\n");
-		cprintf("  list    list games and parties\n");
-		cprintf("  join    join a party\n");
-		cprintf("  create  create a party\n");
-		cprintf("  quit    quit the server\n");
-		cprintf("  help    print this help\n");
+		cprintf(cid, "Available commands are:\n");
+		cprintf(cid, "  list    list games and parties\n");
+		cprintf(cid, "  join    join a party\n");
+		cprintf(cid, "  create  create a party\n");
+		cprintf(cid, "  quit    quit the server\n");
+		cprintf(cid, "  help    print this help\n");
 	} else {
 		goto invalid;
 	}
 	goto end;
 
 invalid:
-	cprintf("Invalid trailing '%s'.\n", line);
+	cprintf(cid, "Invalid trailing '%s'.\n", line);
 end:
-	cprintf("> ");
-	cflush();
+	cprintf(cid, "> ");
+	cflush(cid);
 	return 0;
 }
 
 void
-client_clean(__attribute__((unused)) struct client_state *state)
+client_clean(int cid)
 {
+	clients[cid].party = -1;
 	return;
 }
