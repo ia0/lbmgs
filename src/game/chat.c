@@ -97,10 +97,8 @@ chat_leave(int cid, void *data)
 			cprompt(pid);
 		}
 	}
-	if (last) {
-		chat_clean(data);
+	if (last)
 		return -1;
-	}
 
 	return 0;
 }

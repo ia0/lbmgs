@@ -34,6 +34,10 @@ client_init(int cid);
 int /* success == 0, failure == -1 */
 client_process(int cid, char *line);
 
+/* client_leave(): meak the client leave its party */
+void
+client_leave(int cid);
+
 /* client_clean(): cleans the client state */
 void
 client_clean(int cid);

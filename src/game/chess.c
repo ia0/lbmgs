@@ -20,8 +20,7 @@ enum piece {
 };
 struct chess {
 	int8_t board[8][8]; /* [a-h][1-8] */
-	int white;
-	int black;
+	int ids[2]; /* [0] is white, [1] is black */
 	int turn:1; /* white == 0, black == -1 */
 };
 
@@ -77,9 +76,9 @@ board_print(int cid, struct chess *chess)
 	unsigned char x;
 	int y, start, end, step;
 
-	assert(chess->white == cid || chess->black == cid);
+	assert(chess->ids[0] == cid || chess->ids[1] == cid);
 
-	if (chess->white == cid) {
+	if (chess->ids[0] == cid) {
 		start = 7;
 		end = -1;
 		step = -1;
@@ -107,8 +106,8 @@ chess_create(int cid)
 
 	chess = malloc(sizeof(*chess));
 	board_init(chess->board);
-	chess->white = cid;
-	chess->black = -1;
+	chess->ids[0] = cid;
+	chess->ids[1] = -1;
 	chess->turn = 0;
 
 	cprintf(cid, "You play white.\n");
@@ -134,8 +133,8 @@ chess_join(int cid, void *data)
 	assert(valid_cid(cid));
 	assert(chess != NULL);
 
-	chess->black = cid;
-	pid = chess->white;
+	chess->ids[1] = cid;
+	pid = chess->ids[0];
 
 	cprintf(pid, "\n");
 	board_print(pid, data);
@@ -149,75 +148,53 @@ chess_join(int cid, void *data)
 	return 1;
 }
 
-/* static int */
-/* chess_leave(int cid, void *data) */
-/* { */
-/* 	struct chess *chess = data; */
-/* 	int i, last; */
+static int
+chess_leave(int cid, void *data)
+{
+	struct chess *chess = data;
+	int c, pid;
 
-/* 	assert(valid_cid(cid)); */
-/* 	assert(chess != NULL); */
+	assert(valid_cid(cid));
+	assert(chess != NULL);
+	assert(chess->ids[0] == cid || chess->ids[1] == cid);
 
-/* 	for (i = 0; i < ID_SLOTS; i++) */
-/* 		if (chess->ids[i] == cid) */
-/* 			break; */
-/* 	if (i == ID_SLOTS) { */
-/* 		geprintf(cid, "could not find chess slot\n"); */
-/* 		return 0; */
-/* 	} */
+	c = chess->ids[1] == cid;
+	chess->ids[c] = -1;
 
-/* 	chess->ids[i] = -1; */
+	cprintf(cid, "Ending chess.\n");
 
-/* 	cprintf(cid, "Ending chess.\n"); */
+	pid = chess->ids[1-c];
 
-/* 	for (last = 1, i = 0; i < ID_SLOTS; i++) { */
-/* 		int pid = chess->ids[i]; */
-/* 		if (pid != -1) { */
-/* 			assert(pid != cid); */
-/* 			last = 0; */
-/* 			cprintf(pid, "\n%d has left.\n", cid); */
-/* 			cprompt(pid); */
-/* 		} */
-/* 	} */
-/* 	if (last) { */
-/* 		chess_clean(data); */
-/* 		return -1; */
-/* 	} */
+	if (pid == -1)
+		return -1;
 
-/* 	return 0; */
-/* } */
+	cprintf(pid, "\n");
+	client_leave(pid);
+	cprompt(pid);
 
-/* static int */
-/* chess_process(int cid, void *data, char *line) */
-/* { */
-/* 	struct chess *chess = data; */
-/* 	int i; */
+	return 0;
+}
 
-/* 	assert(chess != NULL); */
+static int
+chess_process(int cid, void *data, char *line)
+{
+	struct chess *chess = data;
 
-/* 	if (!*line) */
-/* 		return -1; */
+	assert(chess != NULL);
 
-/* 	for (i = 0; i < ID_SLOTS; i++) { */
-/* 		int pid = chess->ids[i]; */
-/* 		if (pid != -1) { */
-/* 			if (pid != cid) { */
-/* 				cprintf(pid, "\n%d: %s\n", cid, line); */
-/* 				cprompt(pid); */
-/* 			} else { */
-/* 				cprintf(cid, "%d) %s\n", cid, line); */
-/* 			} */
-/* 		} */
-/* 	} */
+	if (!*line)
+		return -1;
 
-/* 	return 0; */
-/* } */
+	cprintf(cid, "todo '%s'\n", line);
+
+	return 0;
+}
 
 struct game chess_game = {
 	.name = "chess",
 	.create = chess_create,
 	.clean = chess_clean,
 	.join = chess_join,
-	/* .leave = chess_leave, */
-	/* .process = chess_process, */
+	.leave = chess_leave,
+	.process = chess_process,
 };

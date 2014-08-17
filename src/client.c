@@ -152,7 +152,7 @@ client_process(int cid, char *line)
 		assert(valid_party(p));
 		assert(parties[p].game->process != NULL);
 		if (parties[p].game->process(cid, parties[p].data, line) < 0)
-			client_clean(cid);
+			client_leave(cid);
 		goto end;
 	}
 
@@ -198,24 +198,35 @@ end:
 }
 
 void
-client_clean(int cid)
+client_leave(int cid)
 {
 	int p;
 
 	assert(valid_cid(cid));
 
 	p = clients[cid].party;
-
-	if (p == -1)
-		return;
-
 	assert(valid_party(p));
 	assert(parties[p].game->leave != NULL);
 	if (parties[p].game->leave(cid, parties[p].data)) {
+		assert(parties[p].game->clean != NULL);
+		parties[p].game->clean(parties[p].data);
 		parties[p].game = NULL;
 		parties[p].data = NULL;
 	}
 	clients[cid].party = -1;
+
+	return;
+}
+
+void
+client_clean(int cid)
+{
+	assert(valid_cid(cid));
+
+	if (clients[cid].party == -1)
+		return;
+
+	client_leave(cid);
 
 	return;
 }
