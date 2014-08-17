@@ -16,6 +16,7 @@ SRCS += src/parser.c
 SRCS += src/client.c
 SRCS += src/game.c
 SRCS += src/game/chat.c
+SRCS += src/game/chess.c
 
 OBJS = $(patsubst src/%.c,build/%.o,$(SRCS))
 DEPS = $(patsubst src/%.c,build/%.d,$(SRCS))

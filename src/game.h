@@ -4,10 +4,10 @@
 struct game {
 	char *name;
 	void *(*create)(int cid);
+	void (*clean)(void *data);
 	int (*join)(int cid, void *data);
 	int (*leave)(int cid, void *data);
 	int (*process)(int cid, void *data, char *line);
-	void (*clean)(void *data);
 };
 
 extern int gameslen;

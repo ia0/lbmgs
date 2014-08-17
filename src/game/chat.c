@@ -53,7 +53,6 @@ chat_join(int cid, void *data)
 		if (pid != -1 && pid != cid) {
 			cprintf(pid, "\n%d has joined.\n", cid);
 			cprompt(pid);
-			cflush(pid);
 		}
 	}
 
@@ -96,7 +95,6 @@ chat_leave(int cid, void *data)
 			last = 0;
 			cprintf(pid, "\n%d has left.\n", cid);
 			cprompt(pid);
-			cflush(pid);
 		}
 	}
 	if (last) {
@@ -124,7 +122,6 @@ chat_process(int cid, void *data, char *line)
 			if (pid != cid) {
 				cprintf(pid, "\n%d: %s\n", cid, line);
 				cprompt(pid);
-				cflush(pid);
 			} else {
 				cprintf(cid, "%d) %s\n", cid, line);
 			}

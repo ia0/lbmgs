@@ -2,9 +2,11 @@
 
 #include <game.h>
 #include <game/chat.h>
+#include <game/chess.h>
 
 struct game *games[] = {
 	&chat_game,
+	&chess_game,
 };
 
 int gameslen = sizeof(games)/sizeof(games[0]);
