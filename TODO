@@ -1,1 +1,1 @@
-- rename to lbmgs
+- ne pas utiliser FILE* puisqu'on ne contrôle pas forcément les flush
