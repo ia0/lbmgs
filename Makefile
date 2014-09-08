@@ -32,7 +32,7 @@ $(EXE): $(OBJS)
 
 -include $(DEPS)
 
-build/%.o build/%.d:
+$(OBJS):build/%.o:
 	@mkdir -p $(dir $@)
 	@echo "  CC build/$*.o"
 	@$(CC) -MMD -c src/$*.c -o build/$*.o
