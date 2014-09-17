@@ -1,13 +1,22 @@
+.SUFFIXES:
+
+ifeq ($(V),1)
+DO =
+PP = @:
+else
+DO = @
+PP = @echo
+endif
+
 GCC = gcc -Wall -Wextra -Werror
 CC = $(GCC) -Isrc
 LD = $(GCC)
 
-DEBUG = yes
-ifdef DEBUG
+ifeq ($(R),1)
+CC += -DNDEBUG
+else
 GCC += -g
 CC += -DDEBUG
-else
-CC += -DNDEBUG
 endif
 
 SRCS += src/main.c
@@ -21,22 +30,19 @@ SRCS += src/game/chess.c
 OBJS = $(patsubst src/%.c,build/%.o,$(SRCS))
 DEPS = $(patsubst src/%.c,build/%.d,$(SRCS))
 
-EXE = build/lbmgs
 
-.PHONY: all
-all: $(EXE)
-
-$(EXE): $(OBJS)
-	@echo "  LD $@"
-	@$(LD) $(OBJS) -o $@
+build/lbmgs: $(OBJS)
+	$(PP) "  LD $@"
+	$(DO)$(LD) $(OBJS) -o $@
 
 -include $(DEPS)
 
-$(OBJS):build/%.o:
-	@mkdir -p $(dir $@)
-	@echo "  CC build/$*.o"
-	@$(CC) -MMD -c src/$*.c -o build/$*.o
+build/%.o:
+	$(DO)mkdir -p $(dir $@)
+	$(PP) "  CC $@"
+	$(DO)$(CC) -MMD -c src/$*.c -o $@
 
 .PHONY: clean
 clean:
-	rm -rf build
+	$(PP) "  RM build"
+	$(DO)rm -rf build
