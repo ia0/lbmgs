@@ -27,9 +27,8 @@ SRCS += src/game.c
 SRCS += src/game/chat.c
 SRCS += src/game/chess.c
 
-OBJS = $(patsubst src/%.c,build/%.o,$(SRCS))
-DEPS = $(patsubst src/%.c,build/%.d,$(SRCS))
-
+OBJS = $(SRCS:src/%.c=build/%.o)
+DEPS = $(SRCS:src/%.c=build/%.d)
 
 build/lbmgs: $(OBJS)
 	$(PP) "  LD $@"
